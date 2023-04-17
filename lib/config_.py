@@ -2,11 +2,12 @@
 校验配置文件, 提供默认值
 """
 import datetime
+import os
 
 import yaml
-from os import path
-import lib.utils_
-from lib.enum_ import CKey
+
+from lib import enum_
+from lib import utils_
 
 
 class YamlConfig:
@@ -23,9 +24,9 @@ class YamlConfig:
     }
     _RD_STR = {
         'root': 'RD_STR',
-        'level': '!!int 5',
-        'count': '!!int 1',
-        'bit': '!!int 16'
+        'level': '5',
+        'count': '5',
+        'bit': '32'
     }
 
     def __init__(self, file, root):
@@ -69,15 +70,13 @@ class YamlConfig:
         确认配置文件是否存在
         :return: bool
         """
-        return True if path.exists(self.f) else False
+        return True if os.path.exists(self.f) else False
 
     def _config_read_yaml(self):
         """
         读取配置文件
         :return: 读取的配置文件值, yaml.load
         """
-        # with open(self.f, 'r', encoding='utf-8') as yml:
-        #     res = yaml.load(yml, yaml.FullLoader)
         yml = open(self.f, 'r', encoding='utf-8')
         config = yaml.load(yml, yaml.FullLoader)
         yml.close()
@@ -90,7 +89,7 @@ class YamlConfig:
         :return: 正确返回 true, 错误返回 false
         """
         try:
-            var = yml[self.r]
+            x = yml[self.r]
             return True
         except KeyError:
             return False
@@ -111,20 +110,22 @@ class YamlConfig:
     def _config_verity_value(self) -> bool:
         """
         验证key的value是否合规
-        :param value: key的值
         """
-        _bool = []
-
+        _list_bool = []
+        _def_bool = []
+        for i in range(len(enum_.CKey)):
+            _def_bool.append(True)
         conf = self._config_read_yaml()[self.r]
-        if isinstance(conf[CKey.level.name], int):
-            if 1 <= conf[CKey.level.name] <= 5:
-                _bool.append(True)
-        if isinstance(conf[CKey.count.name], int):
-            if 1 <= conf[CKey.count.name]:
-                _bool.append(True)
-        if isinstance(conf[CKey.bit.name], int):
-            if 8 <= conf[CKey.bit.name]:
-                _bool.append(True)
+        if isinstance(conf[enum_.CKey.level.name], int):
+            if 1 <= conf[enum_.CKey.level.name] <= 5:
+                _list_bool.append(True)
+        if isinstance(conf[enum_.CKey.count.name], int):
+            if 1 <= conf[enum_.CKey.count.name]:
+                _list_bool.append(True)
+        if isinstance(conf[enum_.CKey.bit.name], int):
+            if 8 <= conf[enum_.CKey.bit.name]:
+                _list_bool.append(True)
+        return sorted(_def_bool) == sorted(_list_bool)
 
     def _config_failed_fix(self, _bool: bool, _exit: int, tips):
         """
@@ -135,7 +136,8 @@ class YamlConfig:
         """
         if not _bool:
             self._config_default_write()
-            print(tips)
+            print('{0}, 退出代码{1}'.format(tips, _exit))
+            os.system('pause')
             exit(_exit)
 
     def loaded_config(self):
@@ -149,12 +151,13 @@ class YamlConfig:
         """
         # 配置文件不存在
         if not self._config_file_exists():
-            lib.utils_.create_file(self.f, self._config_default_value())
+            utils_.create_file(self.f, self._config_default_value())
         conf = self._config_read_yaml()
-        vc_root = self._config_verity_root(conf)
         # 配置文件根错误
         self._config_failed_fix(self._config_verity_root(conf), -1, '配置文件错误已重置, 请重启程序')
         # 配置文件key错误 (比较两个列表)
         self._config_failed_fix(self._config_verity_key(), -2, '配置文件key错误已重置, 请重启程序')
+        # 配置文件key的value类型错误或不符合取值范围 (比较两个列表)
+        self._config_failed_fix(self._config_verity_value(), -3, '配置文件key的值错误或不符合规范已被重置, 请重启程序')
         # 返回带有正确配置文件的dict
         return conf[self.r]
